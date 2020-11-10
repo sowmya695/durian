@@ -12,7 +12,9 @@ import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
+import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
+import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 import org.springframework.core.env.Environment;
 
@@ -20,16 +22,18 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.mosip.datashare.dto.JWTSignatureResponseDto;
 import io.mosip.datashare.dto.SignResponseDto;
-import io.mosip.datashare.dto.SignatureResponse;
 import io.mosip.datashare.exception.SignatureException;
 import io.mosip.datashare.util.DigitalSignatureUtil;
 import io.mosip.datashare.util.RestUtil;
 import io.mosip.kernel.core.exception.ServiceError;
+import io.mosip.kernel.core.util.CryptoUtil;
 
 @RunWith(PowerMockRunner.class)
 @PowerMockIgnore({ "com.sun.org.apache.xerces.*", "javax.xml.*", "org.xml.*", "javax.management.*", "org.w3c.dom.*",
 		"com.sun.org.apache.xalan.*" })
+@PrepareForTest(value = CryptoUtil.class)
 public class DigitalSignatureUtilTest {
 
 	/** The environment. */
@@ -57,8 +61,8 @@ public class DigitalSignatureUtilTest {
 	public void setUp() throws JsonParseException, JsonMappingException, IOException {
 
 		signResponseDto = new SignResponseDto();
-		SignatureResponse sign = new SignatureResponse();
-		sign.setSignature("testdata");
+		JWTSignatureResponseDto sign = new JWTSignatureResponseDto();
+		sign.setJwtSignedData("testdata");
 		signResponseDto.setResponse(sign);
 		signResponse = "{\r\n" + 
     		"  \"id\": \"string\",\r\n" + 
@@ -78,13 +82,17 @@ public class DigitalSignatureUtilTest {
 		Mockito.when(objectMapper.readValue(signResponse, SignResponseDto.class)).thenReturn(signResponseDto);
 		Mockito.when(environment.getProperty("mosip.data.share.datetime.pattern"))
 				.thenReturn("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+		Mockito.when(environment.getProperty("mosip.data.share.includeCertificateHash")).thenReturn("false");
+		Mockito.when(environment.getProperty("mosip.data.share.includeCertificate")).thenReturn("false");
+		Mockito.when(environment.getProperty("mosip.data.share.includePayload")).thenReturn("false");
 	}
 
 	@Test
 	public void signSuccessTest() throws IOException {
 		String test = "testdata";
 		byte[] sample = test.getBytes();
-		
+		PowerMockito.mockStatic(CryptoUtil.class);
+		Mockito.when(CryptoUtil.encodeBase64(Mockito.any())).thenReturn(test);
 		String signedData = digitalSignatureUtil.sign(sample);
 		assertEquals(test, signedData);
 		
@@ -95,6 +103,8 @@ public class DigitalSignatureUtilTest {
 	public void testIOException() throws JsonParseException, JsonMappingException, IOException {
 		String test = "testdata";
 		byte[] sample = test.getBytes();
+		PowerMockito.mockStatic(CryptoUtil.class);
+		Mockito.when(CryptoUtil.encodeBase64(Mockito.any())).thenReturn(test);
 		Mockito.when(objectMapper.readValue(signResponse, SignResponseDto.class)).thenThrow(new IOException());
 		digitalSignatureUtil.sign(sample);
 	}
@@ -112,7 +122,8 @@ public class DigitalSignatureUtilTest {
 		signResponseDto.setErrors(errors);
 		String test = "testdata";
 		byte[] sample = test.getBytes();
-
+		PowerMockito.mockStatic(CryptoUtil.class);
+		Mockito.when(CryptoUtil.encodeBase64(Mockito.any())).thenReturn(test);
 		digitalSignatureUtil.sign(sample);
 	}
 }

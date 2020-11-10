@@ -1,7 +1,6 @@
 package io.mosip.datashare.util;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -16,7 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.mosip.datashare.constant.ApiName;
 import io.mosip.datashare.constant.LoggerFileConstant;
-import io.mosip.datashare.dto.SignRequestDto;
+import io.mosip.datashare.dto.JWTSignatureRequestDto;
 import io.mosip.datashare.dto.SignResponseDto;
 import io.mosip.datashare.exception.ApiNotAccessibleException;
 import io.mosip.datashare.exception.SignatureException;
@@ -25,6 +24,7 @@ import io.mosip.kernel.core.exception.ExceptionUtils;
 import io.mosip.kernel.core.exception.ServiceError;
 import io.mosip.kernel.core.http.RequestWrapper;
 import io.mosip.kernel.core.logger.spi.Logger;
+import io.mosip.kernel.core.util.CryptoUtil;
 import io.mosip.kernel.core.util.DateUtils;
 
 
@@ -59,15 +59,15 @@ public class DigitalSignatureUtil {
 	 * @param packet the packet
 	 * @return the byte[]
 	 */
-	public String sign(byte[] packet) {
+	public String sign(byte[] data) {
 		try {
 			LOGGER.debug(LoggerFileConstant.SESSIONID.toString(), LoggerFileConstant.POLICYID.toString(),
 					LoggerFileConstant.POLICYID.toString(),
 					"DigitalSignatureUtil::sign()::entry");
-			String packetData = new String(packet, StandardCharsets.UTF_8);
-			SignRequestDto dto = new SignRequestDto();
-			dto.setData(packetData);
-			RequestWrapper<SignRequestDto> request = new RequestWrapper<>();
+			String dataToSign = CryptoUtil.encodeBase64(data);
+			JWTSignatureRequestDto dto = new JWTSignatureRequestDto();
+			dto.setDataToSign(dataToSign);
+			RequestWrapper<JWTSignatureRequestDto> request = new RequestWrapper<>();
 			request.setRequest(dto);
 			request.setMetadata(null);
 			DateTimeFormatter format = DateTimeFormatter.ofPattern(environment.getProperty(DATETIME_PATTERN));
@@ -82,7 +82,7 @@ public class DigitalSignatureUtil {
 				ServiceError error = responseObject.getErrors().get(0);
 				throw new SignatureException(error.getMessage());
 			}
-			String signedData = responseObject.getResponse().getSignature();
+			String signedData = responseObject.getResponse().getJwtSignedData();
 			LOGGER.debug(LoggerFileConstant.SESSIONID.toString(), LoggerFileConstant.POLICYID.toString(),
 					LoggerFileConstant.POLICYID.toString(), "DigitalSignatureUtil::sign()::exit");
 			return signedData;
